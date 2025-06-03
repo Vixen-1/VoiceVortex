@@ -1,3 +1,4 @@
+# utils/nlp_utils.py
 from typing import List, Dict, Any
 import spacy
 
@@ -32,24 +33,33 @@ def extract_sub_questions(query: str) -> List[str]:
 
     return sub_questions if sub_questions else [query.lower().strip()]
 
-
-def fetch_answers_from_db(cursor, embedding: List[float]) -> List[Dict[str, Any]]:
-    vector_str = f'[{",".join(map(str, embedding))}]'
-    cursor.execute(
-        """
-        SELECT question, answer, question_embedding <=> %s::vector AS distance
-        FROM qna
-        ORDER BY distance ASC
-        LIMIT 5
-        """,
-        (vector_str,)
-    )
-    return cursor.fetchall()
+def fetch_answers_from_db(collection, embedding: List[float]) -> List[Dict[str, Any]]:
+    results = collection.aggregate([
+        {
+            "$vectorSearch": {
+                "index": "vector_index",
+                "path": "question_embedding",
+                "queryVector": embedding,
+                "numCandidates": 100,
+                "limit": 5
+            }
+        },
+        {
+            "$project": {
+                "question": 1,
+                "answer": 1,
+                "score": {"$meta": "vectorSearchScore"},
+                "_id": 0
+            }
+        }
+    ])
+    return list(results)
 
 def analyze_results(sub_query: str, results: List[Dict[str, Any]]) -> Dict[str, Any]:
     if results:
         best_result = results[0]
-        if best_result["distance"] < 0.3:
+        distance = 1 - best_result["score"]
+        if distance < 0.3:
             return {
                 "question": sub_query,
                 "answer": best_result["answer"],
@@ -57,8 +67,8 @@ def analyze_results(sub_query: str, results: List[Dict[str, Any]]) -> Dict[str, 
             }
         else:
             possible_questions = [
-                {"question": r["question"], "distance": r["distance"]}
-                for r in results if r["distance"] < 0.5
+                {"question": r["question"], "distance": 1 - r["score"]}
+                for r in results if (1 - r["score"]) < 0.5
             ]
             if possible_questions:
                 return {
@@ -67,11 +77,8 @@ def analyze_results(sub_query: str, results: List[Dict[str, Any]]) -> Dict[str, 
                     "type": "ambiguous",
                     "suggestions": possible_questions
                 }
-    print(best_result)
     return {
         "question": sub_query,
         "answer": "Sorry, I couldn't find an answer for this question.",
         "type": "no_match"
     }
-
-

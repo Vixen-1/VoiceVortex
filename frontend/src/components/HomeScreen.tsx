@@ -12,7 +12,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { setActiveTab, setDisplayChat, setNewMessage, setDataId } from "../redux/chatbot";
 import { api } from "../services/api";
 import { RootState } from "../redux/store";
-import EffigoLoader from "../common/EffigoLoader";
+import Loader from "../common/Loader";
 
 const HomeScreen = () => {
   const dispatch = useDispatch();
@@ -30,11 +30,10 @@ const HomeScreen = () => {
   const handleSearch = async () => {
     setMessageValue("");
     setLoading(true);
-    const payload = { type: dataId };
     const url = `/popular-questions/`;
 
     try {
-      const response = await api.post(url, payload, {
+      const response = await api.get(url, {
         headers: {
           "Content-Type": "application/json",
         },
@@ -119,7 +118,7 @@ const HomeScreen = () => {
         <Typography className="container-text">Popular Searches</Typography>
         {loading ? (
           <Box display={"flex"} justifyContent={"center"}>
-            <EffigoLoader />
+            <Loader />
           </Box>
         ) : questions && questions.length > 0 ? (
           <Box display="flex" flexDirection="column" mt={1} gap={0.1}>

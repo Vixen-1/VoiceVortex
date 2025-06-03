@@ -13,7 +13,7 @@ import { RootState } from "../redux/store";
 import { setDisplayChat, setMessages, setNewMessage } from "../redux/chatbot";
 import { api } from "../services/api";
 import { useNavigate } from "react-router-dom";
-import EffigoLoader from "../common/EffigoLoader";
+import Loader from "../common/Loader";
 import parseMarkdownToJSX from "../utils/parseMarkdownToJSX";
 import avatar from "../assets/chatbot.png";
 import user2 from "../assets/user2.webp";
@@ -95,7 +95,7 @@ const Messages = () => {
     }
     setMessageValue("");
     setLoading(true);
-    const payload = { question: sentMessage, type: dataId };
+    const payload = { question: sentMessage };
     const url = `/chat`;
 
     try {
@@ -216,7 +216,7 @@ const Messages = () => {
                     alignItems: "center",
                   }}
                 >
-                  <EffigoLoader />
+                  <Loader />
                 </Box>
               </Box>
             )}

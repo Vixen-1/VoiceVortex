@@ -1,30 +1,49 @@
+# gemini_function/prompt.py
 from fastapi import HTTPException
-import google.generativeai as genai
-from Configuration.config import Api_key
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.llms import HuggingFaceHub
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from Configuration.config import Hugging_Face_Api_key
+import logging
 
-genai.configure(api_key=Api_key)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def get_gemini_embeddings(texts):
+# Initialize LangChain embedding model
+embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+# Initialize Hugging Face LLM
+try:
+    llm = HuggingFaceHub(
+        repo_id="mistralai/Mixtral-8x7B-Instruct-v0.1",
+        huggingfacehub_api_token=Hugging_Face_Api_key,
+        model_kwargs={"temperature": 0.7, "max_length": 512}
+    )
+    logger.info("Hugging Face LLM initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize Hugging Face LLM: {str(e)}")
+    raise Exception(f"Hugging Face LLM initialization failed: {str(e)}")
+
+def get_langchain_embeddings(texts):
     try:
         embeddings = []
         for text in texts:
-            response = genai.embed_content(
-                model="models/text-embedding-004",
-                content=text,
-                task_type="retrieval_document"
-            )
-            embedding = response["embedding"]
-            if len(embedding) != 768:
-                raise ValueError(f"Embedding for '{text}' has length {len(embedding)}, expected 768")
+            embedding = embedding_model.embed_query(text)
+            if len(embedding) != 384:
+                raise ValueError(f"Embedding for '{text}' has length {len(embedding)}, expected 384")
             embeddings.append(embedding)
         return embeddings
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gemini API error: {str(e)}")
+        logger.error(f"Embedding error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Embedding error: {str(e)}")
 
-def format_answer_with_gemini(answers, original_query):
+def format_answer_with_langchain(answers, original_query):
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        prompt = f"""
+        # Define prompt template
+        prompt_template = PromptTemplate(
+            input_variables=["answers", "original_query"],
+            template="""
 You are given a list of answers to sub-questions related to a user query: '{original_query}'.
 
 Your task is to format these answers into a clear and well-structured markdown response with the following rules:
@@ -60,8 +79,13 @@ Answers:
 
 Return the final result in **markdown format** only.
 """
+        )
 
-        response = model.generate_content(prompt)
-        return response.text
+        # Create LLM chain
+        chain = LLMChain(llm=llm, prompt=prompt_template)
+        response = chain.run(answers=answers, original_query=original_query)
+        logger.info("Answer formatted successfully")
+        return response
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gemini formatting error: {str(e)}")
+        logger.error(f"Formatting error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Formatting error: {str(e)}")

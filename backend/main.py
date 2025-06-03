@@ -1,12 +1,11 @@
+# main.py
 from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from psycopg2.extras import RealDictCursor
-import google.generativeai as genai
 import re
-from gemini_function.prompt import format_answer_with_gemini, get_gemini_embeddings
+from gemini_function.prompt import format_answer_with_langchain, get_langchain_embeddings
 from utils.nlp_utils import extract_sub_questions
 from models.pydantic import QueryRequest
-from Configuration.config import db_pool, Api_key
+from Configuration.config import db
 import threading
 from queue import Queue
 from threads.search_count_thread import update_search_counts
@@ -27,14 +26,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-genai.configure(api_key=Api_key)
 
 router = APIRouter()
+
 @router.post("/chat/")
 async def ask_question(request: QueryRequest):
     try:
         query = request.question
-        query_type = request.type
 
         # Check if the query matches a greeting or gratitude pattern
         query_lower = query.lower().strip()
@@ -53,7 +51,7 @@ async def ask_question(request: QueryRequest):
         sub_questions = extract_sub_questions(query)
 
         # Generate embeddings
-        query_embeddings = get_gemini_embeddings(sub_questions)
+        query_embeddings = get_langchain_embeddings(sub_questions)
 
         # Create queues for thread results
         search_count_queue = Queue()
@@ -62,11 +60,11 @@ async def ask_question(request: QueryRequest):
         # Start threads
         search_thread = threading.Thread(
             target=update_search_counts,
-            args=(sub_questions, query_embeddings, query_type, search_count_queue)
+            args=(sub_questions, query_embeddings, search_count_queue)
         )
         answer_thread = threading.Thread(
             target=retrieve_answers,
-            args=(sub_questions, query_embeddings, query_type, answer_queue)
+            args=(sub_questions, query_embeddings, answer_queue)
         )
 
         search_thread.start()
@@ -89,56 +87,34 @@ async def ask_question(request: QueryRequest):
         # Return formatted response
         return answer_result[1]
 
-    except ValidationError:
-        raise HTTPException(status_code=400, detail="Type can only be buyer or supplier")
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid request: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
-@router.post("/popular-questions/")
-async def get_popular_questions(request: QueryRequest):
+@router.get("/popular-questions/")
+async def get_popular_questions():
     try:
-        query_type = request.type
-
-        conn = db_pool.getconn()
-        try:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute(
-                """
-                SELECT question
-                FROM popular_question
-                WHERE category = %s
-                ORDER BY search_count DESC
-                LIMIT 5
-                """,
-                (query_type,)
-            )
-            results = cursor.fetchall()
-            questions = [row["question"] for row in results]
-            return {
-                "popular_questions": questions,
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-        finally:
-            cursor.close()
-            db_pool.putconn(conn)
-    except ValidationError:
-        raise HTTPException(status_code=400, detail="Type can only be buyer or supplier")
+        popular_questions = db["popular_question"].find(
+            {},  # No filter needed
+            {"question": 1, "_id": 0}
+        ).sort("search_count", -1).limit(5)
+        questions = [doc["question"] for doc in popular_questions]
+        return {
+            "popular_questions": questions,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
- 
+
 @router.post("/search/")
 async def search_question(request: QueryRequest):
     try:
         query = request.question.strip()
-        query_type = request.type
 
-        logger.info(f"Searching for query: '{query}' with type: '{query_type}'")
+        logger.info(f"Searching for query: '{query}'")
 
-        # Select table based on query_type
-        table_name = "qna" if query_type.lower() == "admin" else "client_qna"
-        if not table_name:
-            raise HTTPException(status_code=400, detail="Invalid table name")
+        # Use qna collection
+        collection = db["qna"]
 
         # Clean query: remove filler phrases
         query_lower = query.lower()
@@ -152,7 +128,6 @@ async def search_question(request: QueryRequest):
         query_words = query_lower.split()
         i = 0
         while i < len(query_words):
-            # Check for known multi-word phrases
             found_phrase = False
             for phrase in known_phrases:
                 phrase_words = phrase.split()
@@ -172,39 +147,21 @@ async def search_question(request: QueryRequest):
             logger.info("No valid keywords in query")
             return {"matching_questions": []}
 
-        # Build SQL query with ILIKE for each keyword
-        conn = db_pool.getconn()
-        try:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            # Construct WHERE clause: question ILIKE '%keyword1%' AND question ILIKE '%keyword2%' ...
-            where_conditions = " AND ".join(["question ILIKE %s" for _ in keywords])
-            query_params = [f"%{keyword}%" for keyword in keywords]
-            sql_query = f"""
-                SELECT question
-                FROM {table_name}
-                WHERE {where_conditions}
-            """
-            logger.info(f"Executing SQL: {sql_query} with params: {query_params}")
-            cursor.execute(sql_query, query_params)
-            results = cursor.fetchall()
-            questions = [row["question"] for row in results]
-            logger.info(f"Found {len(questions)} matching questions")
+        # Build MongoDB query
+        query_filter = {
+            "$and": [{"normalized_question": {"$regex": keyword, "$options": "i"}} for keyword in keywords]
+        }
+        results = collection.find(query_filter, {"question": 1, "_id": 0})
+        questions = [doc["question"] for doc in results]
+        logger.info(f"Found {len(questions)} matching questions")
 
-            return {
-                "matching_questions": questions
-            }
-        except Exception as e:
-            logger.error(f"Error executing SQL query: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-        finally:
-            cursor.close()
-            db_pool.putconn(conn)
-
+        return {
+            "matching_questions": questions
+        }
     except ValidationError as e:
-        logger.error(f"Validation error: {str(e)}")
-        raise HTTPException(status_code=400, detail="Invalid query type: must be either 'buyer' or 'supplier'")
+        raise HTTPException(status_code=400, detail=f"Invalid request: {str(e)}")
     except Exception as e:
         logger.error(f"Error processing query: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
-    
+
 app.include_router(router, prefix="/api")

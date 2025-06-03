@@ -1,37 +1,34 @@
+# data_preprocess/prepare_data.py
 import glob
 import pandas as pd
-import psycopg2
-from psycopg2.extras import execute_batch
-import google.generativeai as genai
+from pymongo import MongoClient
 from dotenv import load_dotenv
 import os
-# from Configuration.config import Api_key, db_host, db_name, db_password, db_port, db_user
+from langchain_huggingface import HuggingFaceEmbeddings
 
 load_dotenv()
 
-Api_key = os.getenv("GOOGLE_API_KEY")
-db_name= os.getenv("DB_NAME")
-db_user = os.getenv("DB_USER")
-db_password = os.getenv("DB_PASSWORD")
-db_host = os.getenv("DB_HOST")
-db_port = os.getenv("DB_PORT")
+mongo_uri = os.getenv("MONGO_URI")
+db_name = os.getenv("DB_NAME")
 
-genai.configure(api_key=Api_key)
-# === GET GEMINI EMBEDDING ===
-def get_gemini_embedding(text):
+# Initialize MongoDB client
+mongo_client = MongoClient(mongo_uri)
+db = mongo_client[db_name]
+qna_collection = db["qna"]
+
+# Initialize LangChain embedding model
+embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+# === GET LANGCHAIN EMBEDDING ===
+def get_langchain_embedding(text):
     try:
-        response = genai.embed_content(
-            model="models/text-embedding-004",
-            content=text,
-            task_type="semantic_similarity"
-        )
-        return response["embedding"]
+        return embedding_model.embed_query(text)
     except Exception as e:
         print(f"Embedding error: {e}")
-        return [0.0] * 768  # fallback vector
+        return [0.0] * 384  # Fallback vector (384 dimensions)
 
 # === STEP 1: READ EXCEL FILES ===
-all_files = glob.glob("../data/chatbot_data/*.xlsx")
+all_files = glob.glob("data/client_data/*.xlsx")
 print("Found Excel files:", all_files)
 
 df_list = []
@@ -61,53 +58,37 @@ combined_df = pd.concat(df_list, ignore_index=True)
 combined_df["Questions"] = combined_df["Questions"].str.lower().str.strip()
 combined_df.drop_duplicates(subset="Questions", inplace=True)
 combined_df.to_csv("qna_dataset.csv", index=False)
-print("Cleaned and saved as qna_dataset.csv")
+combined_df["question"] = combined_df["Questions"].str.lower()
+print("Chatbot data cleaned successfully!")
 
 # === STEP 3: GENERATE EMBEDDINGS ===
 questions = combined_df["Questions"].tolist()
 embeddings = []
 print("Generating embeddings...")
-for i in range(0, len(questions), 10):
-    batch = questions[i:i+10]
-    batch_embeddings = [get_gemini_embedding(q) for q in batch]
-    embeddings.extend(batch_embeddings)
+for i in range(0, len(questions), 4):
+        batch = questions[i:i + 4]
+        batch_embeddings = [get_langchain_embedding(q) for q in batch]
+        embeddings.extend(batch_embeddings)
 print("Embeddings generated successfully.")
 
-# === STEP 4: LOAD INTO POSTGRES WITH PGVECTOR ===
-print("Connecting to PostgreSQL...")
-conn = psycopg2.connect(
-    dbname=db_name,
-    user=db_user,
-    password=db_password,
-    host=db_host,
-    port=db_port
-)
-cursor = conn.cursor()
+# === STEP 4: INITIALIZE COLLECTIONS AND LOAD INTO MONGODB ===
+print("Initializing MongoDB collections...")
+print("Connecting to MongoDB...")
+qna_collection.drop()
 
-cursor.execute("""
-    CREATE EXTENSION IF NOT EXISTS vector;
-    CREATE TABLE IF NOT EXISTS qna (
-        id SERIAL PRIMARY KEY,
-        question TEXT NOT NULL,
-        answer TEXT NOT NULL,
-        normalized_question TEXT NOT NULL,
-        question_embedding vector(768)
-    );
-    CREATE INDEX IF NOT EXISTS idx_question_embedding ON qna USING hnsw (question_embedding vector_cosine_ops);
-""")
-
-# === STEP 5: BATCH INSERT ===
-insert_query = """
-    INSERT INTO qna (question, answer, normalized_question, question_embedding)
-    VALUES (%s, %s, %s, %s)
-"""
-data = [
-    (row.Questions, row._2, row.Questions.lower(), embedding)
+# Prepare documents
+documents = [
+    {
+        "question": row.Questions,
+        "answer": row._2,
+        "normalized_question": row.Questions.lower(),
+        "question_embedding": embedding
+    }
     for row, embedding in zip(combined_df.itertuples(), embeddings)
 ]
-execute_batch(cursor, insert_query, data)
 
-conn.commit()
-cursor.close()
-conn.close()
-print("✅ Data loaded into PostgreSQL successfully.")
+# Batch insert into MongoDB
+qna_collection.insert_many(documents)
+print("✅ Data loaded into MongoDB successfully.")
+
+mongo_client.close()

@@ -12,7 +12,7 @@ import { RootState } from "../redux/store";
 import { api } from "../services/api";
 import { useDispatch } from "react-redux";
 import { setActiveTab, setDisplayChat, setNewMessage } from "../redux/chatbot";
-import EffigoLoader from "../common/EffigoLoader";
+import Loader from "../common/Loader";
 
 const InfoScreen = () => {
   const dispatch = useDispatch();
@@ -43,7 +43,7 @@ const InfoScreen = () => {
     const message = searchValue;
     if (message.trim().length === 0) return;
     setLoading(true);
-    const payload = { question: message, type: dataId };
+    const payload = { question: message };
     const url = `/search/`;
     // setSearchValue("");
     try {
@@ -110,7 +110,7 @@ const InfoScreen = () => {
       <Box mt={10}>
         {loading ? (
           <Box display={"flex"} justifyContent={"center"}>
-            <EffigoLoader />
+            <Loader />
           </Box>
         ) : questions && questions.length > 0 ? (
    
