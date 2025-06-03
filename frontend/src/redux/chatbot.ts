@@ -22,7 +22,7 @@ type ChatbotState = {
 const initialState: ChatbotState = {
   sessionId: '',
   tenantId: '',
-  dataId: '',
+  dataId: 'admin',
   activeTab: 'home',
   newMessage: '',
   messages: [],

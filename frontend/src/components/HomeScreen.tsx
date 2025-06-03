@@ -1,48 +1,68 @@
-import {
-  ChevronRight,
-  ScheduleOutlined,
-  Search,
-  SendOutlined,
-} from "@mui/icons-material";
+import { ChevronRight, SendOutlined } from "@mui/icons-material";
 import {
   Box,
   IconButton,
-  OutlinedInput,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import chatbot from "../assets/chatbot3.jpg";
-import { useDispatch } from "react-redux";
-import { setActiveTab, setDisplayChat, setNewMessage } from "../redux/chatbot";
-import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { setActiveTab, setDisplayChat, setNewMessage, setDataId } from "../redux/chatbot";
+import { api } from "../services/api";
+import { RootState } from "../redux/store";
+import EffigoLoader from "../common/EffigoLoader";
 
 const HomeScreen = () => {
   const dispatch = useDispatch();
-  // const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const dataId = useSelector((state: RootState) => state.chatbot.dataId);
   const [messageValue, setMessageValue] = useState("");
-  const [searchValue, setSearchValue] = useState("");
   const [messageError, setMessageError] = useState("");
+  const [questions, setQuestions] = useState([]);
 
   const handleMessageValue = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessageValue(e.target.value);
     setMessageError("");
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchValue(e.target.value.toLowerCase());
+  const handleSearch = async () => {
+    setMessageValue("");
+    setLoading(true);
+    const payload = { type: dataId };
+    const url = `/popular-questions/`;
+
+    try {
+      const response = await api.post(url, payload, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      setQuestions(response.data.popular_questions);
+    } catch (err) {
+      console.error("Error sending message:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSendClick = () => {
-    if (messageValue.trim().length === 0) {
+  useEffect(() => {
+    if (dataId) {
+      handleSearch();
+      console.log(questions);
+    }
+  }, [dataId]);
+
+  const handleSendClick = (message: string = messageValue) => {
+    if (message.trim().length === 0) {
       setMessageError("Please enter a message");
     } else {
-      dispatch(setDisplayChat(true))
+      dispatch(setDisplayChat(true));
       setMessageError("");
-      dispatch(setNewMessage(messageValue));
+      dispatch(setNewMessage(message));
       setMessageValue("");
-      dispatch(setActiveTab("message"))
+      dispatch(setActiveTab("message"));
     }
   };
 
@@ -51,16 +71,18 @@ const HomeScreen = () => {
       handleSendClick();
     }
   };
+
   return (
     <Stack
       direction={"column"}
       gap={1.2}
       padding={2}
-      justifyContent={"center"}
-      alignItems={"flex-start"}
       sx={{ background: "linear-gradient(180deg, #012954, #27517E, #FFFFFF)" }}
     >
-      <img src={chatbot} alt="Chatbot" className="chatbot-image" />
+      <Box display="flex" flexDirection="row" alignItems="center" justifyContent={'space-between'} gap={2}>
+        <Box></Box>
+        <img src={chatbot} alt="Chatbot" className="chatbot-image" />
+      </Box>
       <Box
         display="flex"
         flexDirection="column"
@@ -70,17 +92,9 @@ const HomeScreen = () => {
         <Typography className="header-style">Welcome to Chatbot!</Typography>
         <Typography className="header-style">How can I help?</Typography>
       </Box>
-      <Box className="container">
-        <Typography className="container-text">
-          Schedule call with our product expert
-        </Typography>
-        <IconButton className="document-icon">
-          <ScheduleOutlined />
-        </IconButton>
-      </Box>
-      <Box className="container">
+      <Box className="container-row">
         <TextField
-          className="creation-fields"
+          className="message-fields"
           fullWidth
           value={messageValue}
           placeholder="Send us a message"
@@ -90,8 +104,8 @@ const HomeScreen = () => {
         <IconButton
           disabled={messageValue.trim().length === 0}
           className="document-icon"
-          onClick={handleSendClick}
-          area-label="send message"
+          onClick={() => handleSendClick()}
+          aria-label="send message"
         >
           <SendOutlined />
         </IconButton>
@@ -101,67 +115,60 @@ const HomeScreen = () => {
           {messageError}
         </Typography>
       )}
-      <Box className="container-blocks">
-        <OutlinedInput
-          size="small"
-          placeholder="Search"
-          value={searchValue}
-          endAdornment={<Search color="disabled" />}
-          className="tab-search"
-          onChange={handleChange}
-        />
-        <Box
-          display="flex"
-          flexDirection="row"
-          justifyContent="space-between"
-          alignItems="center"
-        >
-          <Typography className="container-text">
-            Location Section Overview
-          </Typography>
-          <IconButton>
-            <ChevronRight />
-          </IconButton>
-        </Box>
-        <Box
-          display="flex"
-          flexDirection="row"
-          justifyContent="space-between"
-          alignItems="center"
-        >
-          <Typography className="container-text">
-            How to Add, Edit, or Remove users
-          </Typography>
-          <IconButton>
-            <ChevronRight />
-          </IconButton>
-        </Box>
-        <Box
-          display="flex"
-          flexDirection="row"
-          justifyContent="space-between"
-          alignItems="center"
-        >
-          <Typography className="container-text">
-            How to create meter work order triggers
-          </Typography>
-          <IconButton>
-            <ChevronRight />
-          </IconButton>
-        </Box>
-        <Box
-          display="flex"
-          flexDirection="row"
-          justifyContent="space-between"
-          alignItems="center"
-        >
-          <Typography className="container-text">
-            How to create PM schedules
-          </Typography>
-          <IconButton>
-            <ChevronRight />
-          </IconButton>
-        </Box>
+      <Box className="container-column">
+        <Typography className="container-text">Popular Searches</Typography>
+        {loading ? (
+          <Box display={"flex"} justifyContent={"center"}>
+            <EffigoLoader />
+          </Box>
+        ) : questions && questions.length > 0 ? (
+          <Box display="flex" flexDirection="column" mt={1} gap={0.1}>
+            {questions.map((question, qIndex) => (
+              <Box
+                display={"flex"}
+                flexDirection={"row"}
+                justifyContent={"space-between"}
+                alignItems={"center"}
+                key={`ambiguous-${qIndex}`}
+                sx={{
+                  boxShadow: "3.31px 4.97px 19.88px 0px #1C57EE14, -1.66px -1.66px 16.57px 0px #1C57EE14",
+                  borderRadius: "6px",
+                  paddingX: "8px",
+                  cursor: "pointer",
+                  "&:hover": {
+                    backgroundColor: "#f0f0f0",
+                  },
+                }}
+                onClick={() => handleSendClick(question)}
+              >
+                <Typography
+                  fontFamily="Poppins"
+                  fontSize={10}
+                  fontWeight={500}
+                  color="#000"
+                >
+                  {question}
+                </Typography>
+                <IconButton>
+                  <ChevronRight
+                    sx={{ height: "15px", width: "15px", color: "black" }}
+                  />
+                </IconButton>
+              </Box>
+            ))}
+          </Box>
+        ) : (
+          <Box>
+            <Typography
+              color="#757575"
+              fontFamily="Poppins"
+              fontSize={12}
+              textAlign="center"
+            >
+              No Search Found
+            </Typography>
+          </Box>
+        )}
       </Box>
     </Stack>
   );

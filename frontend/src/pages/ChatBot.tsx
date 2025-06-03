@@ -1,6 +1,6 @@
 
 import { Box, IconButton, Stack, Typography } from "@mui/material";
-import { Help, Home, Info, MessageOutlined } from "@mui/icons-material";
+import { HelpOutlineOutlined, HomeOutlined, MessageOutlined } from "@mui/icons-material";
 import MessageScreen from "../components/MessageScreen";
 import HelpScreen from "../components/HelpScreen";
 import HomeScreen from "../components/HomeScreen";
@@ -9,14 +9,14 @@ import { RootState } from "../redux/store";
 import { setActiveTab, setDisplayChat } from "../redux/chatbot";
 import { useEffect } from "react";
 
-const BuyerBot = () => {
+const ChatBot = () => {
   const dispatch = useDispatch();
   const activeTab = useSelector((state: RootState) => state.chatbot.activeTab);
  const messages = useSelector((state: RootState) => state.chatbot.messages);
 
   const TabData = [
-    { icon: <Home />, label: "Home", tabName: "home" },
-    { icon: <Help />, label: "Help", tabName: "help" },
+    { icon: <HomeOutlined />, label: "Home", tabName: "home" },
+    { icon: <HelpOutlineOutlined />, label: "Help", tabName: "help" },
     { icon: <MessageOutlined />, label: "Message", tabName: "message" },
   ];
 
@@ -31,7 +31,7 @@ const BuyerBot = () => {
       direction="column"
       gap={1.3}
       justifyContent="space-between"
-      height="100vh"
+      height="auto"
     >
       {activeTab === "message" ? (
         <MessageScreen />
@@ -64,17 +64,18 @@ const BuyerBot = () => {
                 sx={{
                   color: color,
                   padding: "0px",
-                  "& .MuiSvgIcon-root": { fontSize: "20px" },
+                  "& .MuiSvgIcon-root": { fontSize: "22px" },
                 }}
                 aria-label={`Switch to ${tab.label} tab`}
               >
                 {tab.icon}
               </IconButton>
               <Typography
-                fontSize="9px"
+                fontSize={10}
+                fontWeight={600}
                 fontFamily={"Poppins"}
                 color={color}
-                sx={{ marginTop: "-4px" }}
+                sx={{ marginTop: "-2px" }}
               >
                 {tab.label}
               </Typography>
@@ -86,4 +87,4 @@ const BuyerBot = () => {
   );
 };
 
-export default BuyerBot;
+export default ChatBot;

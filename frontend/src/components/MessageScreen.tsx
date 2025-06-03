@@ -13,13 +13,13 @@ import { RootState } from "../redux/store";
 import { setDisplayChat, setMessages, setNewMessage } from "../redux/chatbot";
 import { api } from "../services/api";
 import { useNavigate } from "react-router-dom";
-import Loader from "../common/Loader";
+import EffigoLoader from "../common/EffigoLoader";
 import parseMarkdownToJSX from "../utils/parseMarkdownToJSX";
 import avatar from "../assets/chatbot.png";
 import user2 from "../assets/user2.webp";
-import microphone from "../assets/microphone2.png";
+import microphone from "../assets/microphone.png";
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
-
+import microphoneListening from '../assets/microphoneListening.jfif';
 interface Message {
   text: string | JSX.Element;
   isUser: boolean;
@@ -83,7 +83,6 @@ const Messages = () => {
     fromNewMessage: boolean = false
   ) => {
     if (message.trim().length === 0) return;
-    console.log("displayChat in handleSearch:", displayChat);
     const sentMessage = message.trim();
     if (!fromNewMessage) {
       dispatch(
@@ -96,8 +95,8 @@ const Messages = () => {
     }
     setMessageValue("");
     setLoading(true);
-    const payload = { message: sentMessage, type: dataId };
-    const url = `api/custom-chatbot/chat`;
+    const payload = { question: sentMessage, type: dataId };
+    const url = `/chat`;
 
     try {
       const response = await api.post(url, payload, {
@@ -135,17 +134,6 @@ const Messages = () => {
       handleSearch();
     }
   };
-  // const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-  //   if (e.key === "Enter") {
-  //     if (listening && transcript.trim().length > 0) {
-  //       SpeechRecognition.stopListening();
-  //       handleSearch(transcript);
-  //       resetTranscript();
-  //     } else if (!listening && messageValue.trim().length > 0) {
-  //       handleSearch();
-  //     }
-  //   }
-  // };
 
   const handleMicrophoneClick = () => {
     if (listening) {
@@ -228,7 +216,7 @@ const Messages = () => {
                     alignItems: "center",
                   }}
                 >
-                  <Loader />
+                  <EffigoLoader />
                 </Box>
               </Box>
             )}
@@ -368,9 +356,9 @@ const Messages = () => {
               disabled={loading || !SpeechRecognition.browserSupportsSpeechRecognition()}
             >
               <img
-                src={microphone}
+                src={listening? microphoneListening : microphone}
                 alt="Microphone"
-                style={{ height: "30px", width: "30px" }}
+                style={{ height: "25px", width: "25px" }}
               />
             </IconButton>
             <IconButton

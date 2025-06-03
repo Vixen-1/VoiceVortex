@@ -2,7 +2,7 @@
   width: 50px;
   height: 50px;
   border-radius: 50px;
-  margin-left: 400px;
+  // margin-left: 400px;
 }
 
 .avatar-image {
@@ -18,7 +18,7 @@
   font-family: "Poppins" !important;
 }
 
-.container {
+.container-row {
   margin-right: 10px;
   display: flex;
   flex-direction: row;
@@ -41,38 +41,7 @@
   }
 }
 
-.search-container {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0px 6px;
-  min-width: 300px;
-  max-height: 35px;
-  background: #fff;
-  border: 0.25px solid #979797;
-  border-radius: 8px;
-  cursor: pointer;
-  .container-text {
-    font-size: 12px;
-    color: #202020;
-    font-weight: 500;
-    font-family: "Poppins";
-  }
-}
-
-.tab-search {
-  padding: 8px 12x;
-  width: 400px;
-  max-width: 100%;
-  background: #f2f2f2;
-  border-radius: 5px !important;
-  height: 25px;
-  font-size: 12px !important;
-  border-color: 1px solid #d2e0e6;
-}
-
-.container-blocks {
+.container-column {
   display: flex;
   min-width: 430px;
   max-width: 100%;
@@ -86,7 +55,7 @@
   .container-text {
     font-size: 12px;
     color: #202020;
-    font-weight: 500;
+    font-weight: 600;
     font-family: "Poppins";
     margin: 0;
   }
@@ -95,44 +64,9 @@
   }
 }
 
-.creation-fields {
-  .MuiInputBase-root.MuiOutlinedInput-root {
-    height: 0px;
-    border: none;
-    font-family: "Poppins";
-  }
 
-  .MuiInputBase-root.MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline {
-    border: none !important;
-  }
-
-  .MuiInputBase-root.MuiOutlinedInput-root.Mui-focused
-    .MuiOutlinedInput-notchedOutline {
-    border: none !important;
-  }
-
-  .MuiInputBase-input {
-    font-size: 13px;
-  }
-
-  .MuiInputLabel-root {
-    font-size: 14px;
-    top: -4px;
-  }
-
-  .MuiInputLabel-shrink {
-    top: 0;
-  }
-
-  .MuiInputBase-root {
-    background-color: #f5f5f5;
-    border-radius: 4px;
-    padding: 0 8px;
-  }
-}
 
 .footer-buttons {
-  background-color: #ccc;
   display: flex;
   align-items: center;
   justify-content: space-evenly;
@@ -144,24 +78,6 @@
   width: 100%;
   z-index: 100;
   padding: 10px 0px;
-  box-shadow: 0px 4px 6px 0px rgba(190, 202, 255, 0.06);
-
-  &.home-button {
-    height: 30px;
-    width: 30px;
-  }
-  &.help-button {
-    height: 30px;
-    border-radius: 8px;
-    width: 180px;
-    font-size: 14px;
-  }
-  &.message-button {
-    height: 30px;
-    border-radius: 8px;
-    font-size: 14px;
-    width: 120px;
-  }
 }
 
 .arrow-icon-button {
@@ -175,6 +91,11 @@
 }
 
 .top-headers {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
   color: black;
   position: fixed;
   top: 0;
@@ -182,8 +103,16 @@
   right: 0;
   background-color: white;
   z-index: 1000;
-  padding: 6px 0px;
+  padding: 6px 20px;
   border-bottom: 1px solid #e0e0e0;
+  .tab-search {
+  padding: 8px 12x;
+  background: #f2f2f2;
+  border-radius: 5px !important;
+  height: 30px;
+  font-size: 12px !important;
+  border-color: 1px solid #d2e0e6;
+}
 }
 
 .message-typos {
@@ -228,6 +157,10 @@
   }
   .MuiInputBase-root.MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline {
     border: none !important;
+  }
+  .MuiInputBase-input.MuiOutlinedInput-input{
+    height: 0px;
+    padding: 15px;
   }
   .MuiInputBase-root.MuiOutlinedInput-root.Mui-focused
     .MuiOutlinedInput-notchedOutline {

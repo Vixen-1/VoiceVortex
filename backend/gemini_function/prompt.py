@@ -26,37 +26,42 @@ def format_answer_with_gemini(answers, original_query):
         model = genai.GenerativeModel('gemini-1.5-flash')
         prompt = f"""
 You are given a list of answers to sub-questions related to a user query: '{original_query}'.
- 
+
 Your task is to format these answers into a clear and well-structured markdown response with the following rules:
- 
+
 1. **General Formatting**:
-   - Use **bold headings** for different topics or sections.
+   - Use **bold headings** for different topics or sections, except as specified below.
    - Use **bullet points** to list out key information or steps.
    - Use proper **markdown syntax** (e.g., `**` for bold text).
-   - Do not use bullet point if there is only single point and with the bold headings
- 
-2. **Answer Grouping**:
-   - If multiple sub-questions have related answers, combine them into a single cohesive section.
-   - If there's only one answer, add a relevant heading and use bullet points for the content if applicable.
- 
-3. **Special Cases**:
-   - If an answer contains `"no_match"` or `"ambiguous"`, explicitly state this.
+   - Do not use bullet points if there is only a single point under a bold heading.
+
+2. **Single Answer Handling**:
+   - If there is only one answer and it is **ambiguous**, return **exactly** this message without any heading: "Please provide more clarity or select from the options below."
+   - If there is only one answer and it is **non-ambiguous**, add a relevant heading and format the content with bullet points if applicable.
+   - If there is only one answer and it is **no_match**, add a relevant heading (e.g., "No Match Found") and state the message.
+
+3. **Multiple Answer Handling**:
+   - If multiple sub-questions have related **non-ambiguous** answers, combine them into a single cohesive section with a bold heading.
+   - **Ambiguous answers must be treated as separate sections** with a relevant heading (e.g., "Basic Sourcing") and return **exactly** this message: "Please provide more clarity or select from the options below." **Do not modify, truncate, or combine this message with other answers.**
+   - If an answer contains `"no_match"`, create a separate section with a heading and explicitly state the message.
+
+4. **Special Cases**:
    - For ambiguous answers, **do not include** the suggestions (possible questions) in the response, as they will be handled separately.
-   - For ambiguous answers, only include the message (e.g., "Multiple possible matches found. Please select or rephrase your question.").
- 
-4. **Important Notes**:
+   - For `"no_match"`, explicitly state the message (e.g., "No match found for this query.").
+
+5. **Important Notes**:
    - Do **not** use the original query as a heading.
    - Do **not** add or infer any content on your own—only format the provided data.
    - Keep the structure clean, readable, and concise.
- 
+   - Ensure each sub-question's answer has its own section with a relevant heading for multiple answers, except for a single ambiguous answer.
+
 Answers:
 {answers}
- 
+
 Return the final result in **markdown format** only.
 """
- 
+
         response = model.generate_content(prompt)
-        print(response)
         return response.text
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini formatting error: {str(e)}")
