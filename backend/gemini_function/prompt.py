@@ -1,7 +1,7 @@
 # gemini_function/prompt.py
 from fastapi import HTTPException
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.llms import HuggingFaceHub
+from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint
+# from langchain_community.llms import HuggingFaceHub
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from Configuration.config import Hugging_Face_Api_key
@@ -15,10 +15,11 @@ embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-Mi
 
 # Initialize Hugging Face LLM
 try:
-    llm = HuggingFaceHub(
+    llm = HuggingFaceEndpoint(
         repo_id="mistralai/Mixtral-8x7B-Instruct-v0.1",
         huggingfacehub_api_token=Hugging_Face_Api_key,
-        model_kwargs={"temperature": 0.7, "max_length": 512}
+        temperature=0.7,
+        max_new_tokens=512
     )
     logger.info("Hugging Face LLM initialized successfully")
 except Exception as e:
@@ -40,6 +41,8 @@ def get_langchain_embeddings(texts):
 
 def format_answer_with_langchain(answers, original_query):
     try:
+        if all(answer["type"] == "no_match" for answer in answers):
+            return "Sorry! Please try different question."
         # Define prompt template
         prompt_template = PromptTemplate(
             input_variables=["answers", "original_query"],
@@ -82,8 +85,8 @@ Return the final result in **markdown format** only.
         )
 
         # Create LLM chain
-        chain = LLMChain(llm=llm, prompt=prompt_template)
-        response = chain.run(answers=answers, original_query=original_query)
+        chain = prompt_template | llm
+        response = chain.invoke({"answers": answers, "original_query": original_query})
         logger.info("Answer formatted successfully")
         return response
     except Exception as e:
